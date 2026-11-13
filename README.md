@@ -178,7 +178,7 @@ La IA solo puede usar estos comandos (los descubre con `list_commands` al empeza
 | `move_path` | Mover o renombrar |
 | `search_files` | Busca por nombre con globs (`**/*.py`, `src/**/*.js`…) |
 | `grep_files` | Busca DENTRO de archivos (texto o regex, filtrable por glob) |
-| `run_command` | Ejecuta comandos de terminal en la raíz (timeout configurable) |
+| `run_command` | Ejecuta comandos de terminal solo si el usuario los habilita expresamente al iniciar |
 
 Además mantiene **memoria persistente** en `PROJECT_MEMORY.md`: arquitectura, convenciones, decisiones y preferencias del usuario, compartidas entre todas las sesiones.
 
@@ -186,13 +186,14 @@ Además mantiene **memoria persistente** en `PROJECT_MEMORY.md`: arquitectura, c
 
 ## 🔒 Seguridad
 
-- **Sandbox estricto:** toda ruta se resuelve dentro de la carpeta elegida. `../`, rutas absolutas externas y unit links fuera → rechazados. La raíz nunca se puede borrar ni mover.
-- **Borrados protegidos:** `delete_path` es permanente; el sistema prompt ordena a la IA confirmar contigo antes de cualquier borrado más allá de lo que pediste explícitamente.
-- **Solo localhost:** el puente escucha en `127.0.0.1:17613`; nada expuesto a la red.
-- **Tú eliges la carpeta:** la IA solo ve lo que esté dentro. Cambias de proyecto = cambia su mundo.
-- **Código abierto:** todo lo que ejecuta está en este repo, auditable línea por línea.
+- **Límites de workspace:** las rutas se resuelven dentro de la carpeta elegida; intentos de salir mediante `..` o rutas absolutas externas se rechazan. La raíz no se puede borrar ni mover.
+- **Archivos sensibles bloqueados:** `.env`, credenciales, claves privadas y `.git` se excluyen de lectura, búsqueda y listados (las plantillas `.env.example/.sample/.template` siguen permitidas).
+- **Terminal desactivada por defecto:** `run_command` no se anuncia ni se ejecuta salvo que el usuario la habilite expresamente al iniciar. Si se habilita, los comandos corren con los permisos de la cuenta de Windows; actívala solo cuando sea necesario.
+- **WebSocket restringido:** el puente escucha solo en `127.0.0.1:17613` y acepta orígenes de extensiones Chromium, no páginas web normales.
+- **Tú eliges la carpeta:** la IA solo ve los archivos permitidos dentro del workspace activo. Cambiar de proyecto cambia su ámbito de trabajo.
+- **Código abierto:** todo lo que ejecuta está en este repo y puede auditarse.
 
-Aun así: es una beta con control real de tu disco. **Usa git**, revisa lo que hace y no le des carpetas con secretos (.env, llaves) si no hace falta.
+Aun así, esta versión sigue siendo beta y tiene permisos reales sobre los archivos permitidos del workspace. **Usa Git, revisa los cambios y evita seleccionar carpetas con secretos innecesarios.**
 
 ---
 
