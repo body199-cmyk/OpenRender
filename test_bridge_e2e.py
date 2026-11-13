@@ -13,7 +13,8 @@ PORT = 17799
 ws_root = Path(tempfile.mkdtemp(prefix="zs_bridge_test_"))
 
 cfg_path = HERE / "config.json"
-backup = cfg_path.read_text(encoding="utf-8")
+had_config = cfg_path.exists()
+backup = cfg_path.read_text(encoding="utf-8") if had_config else None
 cfg_path.write_text(json.dumps({
     "workspaceFolder": str(ws_root),
     "mcpServers": {"workspace": {"command": "workspace_mcp.py", "args": []}},
@@ -156,7 +157,10 @@ finally:
     except subprocess.TimeoutExpired:
         proc.kill()
         out = proc.communicate()[0]
-    cfg_path.write_text(backup, encoding="utf-8")
+    if had_config:
+        cfg_path.write_text(backup, encoding="utf-8")
+    else:
+        cfg_path.unlink(missing_ok=True)
 
 print()
 print("--- bridge output (tail) ---")
