@@ -19,7 +19,8 @@ cfg_path.write_text(json.dumps({
     "mcpServers": {"workspace": {"command": "workspace_mcp.py", "args": []}},
 }, indent=2), encoding="utf-8")
 
-env = dict(os.environ, ZS_BRIDGE_PORT=str(PORT), ZS_WORKSPACE_ROOT=str(ws_root))
+env = dict(os.environ, ZS_BRIDGE_PORT=str(PORT), ZS_WORKSPACE_ROOT=str(ws_root),
+           OPENRENDER_ALLOW_COMMANDS="1")
 proc = subprocess.Popen([sys.executable, str(HERE / "bridge.py")],
                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                         text=True, encoding="utf-8", errors="replace", env=env,
@@ -33,7 +34,9 @@ async def main():
     ws = None
     for _ in range(60):  # up to 30s for boot
         try:
-            ws = await websockets.connect(f"ws://127.0.0.1:{PORT}", max_size=16 * 1024 * 1024)
+            ws = await websockets.connect(
+                f"ws://127.0.0.1:{PORT}", max_size=16 * 1024 * 1024,
+                origin="chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
             break
         except Exception:
             await asyncio.sleep(0.5)
@@ -41,6 +44,17 @@ async def main():
         results.append(("bridge reachable", False))
         return
     results.append(("bridge reachable", True))
+
+    # Ordinary websites must not be able to connect to the local bridge.
+    try:
+        bad_ws = await websockets.connect(
+            f"ws://127.0.0.1:{PORT}", origin="https://attacker.example")
+        await bad_ws.close()
+        results.append(("reject non-extension origin", False))
+    except Exception as exc:
+        response = getattr(exc, "response", None)
+        results.append(("reject non-extension origin",
+                        getattr(response, "status_code", None) == 403))
 
     rid = 0
     async def rpc(payload, timeout=40):
