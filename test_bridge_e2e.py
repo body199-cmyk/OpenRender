@@ -24,7 +24,8 @@ cfg_path.write_text(json.dumps({
 }, indent=2), encoding="utf-8")
 
 env = dict(os.environ, ZS_BRIDGE_PORT=str(PORT), ZS_WORKSPACE_ROOT=str(ws_root),
-           OPENRENDER_ALLOW_COMMANDS="1")
+           OPENRENDER_ALLOW_COMMANDS="1",
+           OPENRENDER_EXTENSION_ID="a" * 32)
 proc = subprocess.Popen([sys.executable, str(HERE / "bridge.py")],
                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                         text=True, encoding="utf-8", errors="replace", env=env,
@@ -49,16 +50,19 @@ async def main():
         return
     results.append(("bridge reachable", True))
 
-    # Ordinary websites must not be able to connect to the local bridge.
-    try:
-        bad_ws = await websockets.connect(
-            f"ws://127.0.0.1:{PORT}", origin="https://attacker.example")
-        await bad_ws.close()
-        results.append(("reject non-extension origin", False))
-    except Exception as exc:
-        response = getattr(exc, "response", None)
-        results.append(("reject non-extension origin",
-                        getattr(response, "status_code", None) == 403))
+    # Only this exact installed extension ID may connect.
+    for label, origin in [
+        ("reject non-extension origin", "https://attacker.example"),
+        ("reject other browser extension", "chrome-extension://" + "b" * 32),
+    ]:
+        try:
+            bad_ws = await websockets.connect(
+                f"ws://127.0.0.1:{PORT}", origin=origin)
+            await bad_ws.close()
+            results.append((label, False))
+        except Exception as exc:
+            response = getattr(exc, "response", None)
+            results.append((label, getattr(response, "status_code", None) == 403))
 
     rid = 0
     async def rpc(payload, timeout=40):
