@@ -23,6 +23,7 @@ import asyncio
 import json
 import os
 import queue
+import re
 import subprocess
 import sys
 import threading
@@ -1489,9 +1490,12 @@ async def main():
         await asyncio.sleep(0.6)  # let Windows release the socket before we bind
 
     try:
+        # Only browser-extension origins are accepted. This blocks ordinary
+        # websites from opening a WebSocket to the local filesystem bridge.
+        extension_origin = re.compile(r"^chrome-extension://[a-p]{32}$")
         server_ctx = await websockets.serve(
-            handler, HOST, PORT, ping_interval=20, ping_timeout=20,
-            max_size=16 * 1024 * 1024)
+            handler, HOST, PORT, origins=[extension_origin],
+            ping_interval=20, ping_timeout=20, max_size=16 * 1024 * 1024)
     except OSError as e:
         # errno 10048 (Win) / EADDRINUSE: something we could NOT auto-kill still
         # owns the port - another app, or a python whose cmdline we couldn't read.
