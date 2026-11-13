@@ -1446,6 +1446,21 @@ async def main():
     if not ws:
         log("no usable workspace folder - cannot start. Run start.bat again.", "rd")
         return
+
+    # Ask once per launch when no explicit launcher choice was supplied.
+    # The workspace worker inherits this setting and hides run_command by default.
+    if "OPENRENDER_ALLOW_COMMANDS" not in os.environ:
+        print("\\n  SECURITY: terminal access lets the AI run commands as your Windows user.")
+        try:
+            answer = input("  Allow terminal commands for this session? [y/N]: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            answer = ""
+        os.environ["OPENRENDER_ALLOW_COMMANDS"] = "1" if answer in ("y", "yes") else "0"
+    if os.environ.get("OPENRENDER_ALLOW_COMMANDS") == "1":
+        log("terminal command execution enabled by explicit user approval.", "yl")
+    else:
+        log("terminal command execution disabled (safe default).", "gr")
+
     log(f"the AI has FULL CONTROL of: {ws}", "gr")
     mgr.load_config()
 
