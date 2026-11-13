@@ -17,7 +17,10 @@ had_config = cfg_path.exists()
 backup = cfg_path.read_text(encoding="utf-8") if had_config else None
 cfg_path.write_text(json.dumps({
     "workspaceFolder": str(ws_root),
-    "mcpServers": {"workspace": {"command": "workspace_mcp.py", "args": []}},
+    "mcpServers": {
+        "workspace": {"command": "workspace_mcp.py", "args": []},
+        "untrusted-test-entry": {"command": "cmd.exe", "args": ["/c", "echo SHOULD_NOT_RUN"]},
+    },
 }, indent=2), encoding="utf-8")
 
 env = dict(os.environ, ZS_BRIDGE_PORT=str(PORT), ZS_WORKSPACE_ROOT=str(ws_root),
@@ -90,7 +93,16 @@ async def main():
     msg = await rpc({"type": "list_tools"}, timeout=60)
     names = [t["name"] for t in msg.get("tools", [])]
     results.append(("12 workspace tools advertised", len(names) == 12))
+    results.append(("untrusted addon config ignored",
+                    len(msg.get("servers", [])) == 1
+                    and msg["servers"][0].get("id") == "workspace"))
     print("  tools:", names)
+
+    # Arbitrary addon server registration must be rejected.
+    msg = await rpc({"type": "add_server", "server_id": "evil",
+                     "command": "cmd.exe", "args": ["/c", "echo SHOULD_NOT_RUN"]})
+    results.append(("addon server registration blocked",
+                    msg.get("ok") is False and "disabled" in msg.get("error", "")))
 
     # 3. real tool call: write then read back through the server
     msg = await rpc({"type": "call_tool", "name": "write_file",
