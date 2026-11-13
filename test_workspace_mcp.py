@@ -198,6 +198,21 @@ check("unknown tool errors", "error" in r)
 
 proc.stdin.close()
 proc.wait(timeout=5)
+
+# A fresh default session must not advertise or execute arbitrary terminal commands.
+safe_env = dict(os.environ, ZS_WORKSPACE_ROOT=str(tmp))
+safe_env.pop("OPENRENDER_ALLOW_COMMANDS", None)
+proc = subprocess.Popen([sys.executable, str(SERVER)], stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                        text=True, encoding="utf-8", env=safe_env)
+call("initialize", {"protocolVersion": "2024-11-05", "capabilities": {},
+                    "clientInfo": {"name": "security-test", "version": "0"}})
+safe_names = [x["name"] for x in call("tools/list")["result"]["tools"]]
+check("run_command hidden by default", "run_command" not in safe_names)
+r = tool("run_command", {"command": "whoami"})
+check("run_command blocked by default", "error" in r and "disabled" in r["error"]["message"])
+proc.stdin.close()
+proc.wait(timeout=5)
 print()
 print("Workspace used:", tmp)
 if fails:
