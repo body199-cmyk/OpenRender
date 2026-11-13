@@ -106,6 +106,10 @@ def resolve_path(rel: object, *, must_exist: bool = False) -> Path:
     root_resolved = ROOT.resolve()
     if resolved != root_resolved and root_resolved not in resolved.parents:
         raise ToolError(f"path '{raw}' is outside the workspace")
+    # Re-check AFTER resolving symlinks/junctions: a harmless-looking path
+    # inside the workspace may point at a protected file such as .env.
+    if is_protected_path(resolved):
+        raise ToolError(f"access to sensitive path '{raw}' is blocked by OpenRender")
     if must_exist and not resolved.exists():
         raise ToolError(f"'{raw}' does not exist in the workspace")
     return resolved
