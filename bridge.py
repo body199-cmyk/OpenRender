@@ -789,11 +789,15 @@ class MCPManager:
         self.index_lock = threading.Lock()
 
     def load_config(self):
-        servers = _read_config().get("mcpServers", {}) or {}
-        for sid, spec in servers.items():
-            self.clients[sid] = MCPClient(
-                sid, spec.get("command"), spec.get("args"), spec.get("env"))
-        log(f"configured {len(self.clients)} MCP server(s): {', '.join(self.clients) or '(none)'}", "cy")
+        # Hardened workspace-only build: never spawn arbitrary commands from
+        # config.json. The workspace worker is the sole trusted child process.
+        configured = _read_config().get("mcpServers", {}) or {}
+        ignored = [sid for sid in configured if sid != PRIMARY_SERVER_ID]
+        if ignored:
+            log(f"ignoring untrusted addon MCP server entries: {', '.join(ignored)}", "yl")
+        self.clients[PRIMARY_SERVER_ID] = MCPClient(
+            PRIMARY_SERVER_ID, "workspace_mcp.py", [], {})
+        log("configured 1 trusted MCP server: workspace", "cy")
 
     def start_all(self):
         # Launch every configured server IN PARALLEL, not one after another.
@@ -1062,28 +1066,14 @@ async def handler(ws):
                 asyncio.create_task(run_tool_task(ws, name, args, timeout, rid))
 
             elif mtype in ("add_server", "remove_server"):
-                # Adding/removing an addon MCP server rewrites config.json, which
-                # the bridge only reads at launch - so we ack, then restart the
-                # whole process to pick it up cleanly. The primary Roblox server
-                # is protected inside config_add/remove_server.
-                if mtype == "add_server":
-                    ok, err = await asyncio.to_thread(
-                        config_add_server,
-                        msg.get("server_id"), msg.get("command"),
-                        msg.get("args"), msg.get("env"))
-                else:
-                    ok, err = await asyncio.to_thread(
-                        config_remove_server, msg.get("server_id"))
+                # Arbitrary MCP child processes are intentionally disabled in
+                # this hardened workspace-only build.
                 await ws.send(json.dumps({
                     "type": "server_changed", "id": rid,
-                    "ok": ok, "error": err, "restarting": ok,
+                    "ok": False,
+                    "error": "addon MCP servers are disabled in this hardened build",
+                    "restarting": False,
                 }))
-                if ok:
-                    # Give the ack a beat to flush over the socket, then restart.
-                    async def _do_restart():
-                        await asyncio.sleep(0.4)
-                        restart_self()
-                    asyncio.create_task(_do_restart())
 
             elif mtype == "restart_mcp":
                 sid = msg.get("server")
