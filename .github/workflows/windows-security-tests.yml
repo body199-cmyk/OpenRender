@@ -1,0 +1,31 @@
+name: Windows security tests
+
+on:
+  push:
+    branches:
+      - main
+      - security/harden-openrender-windows
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows-tests:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install test dependency
+        run: python -m pip install websockets
+
+      - name: Test workspace tools and security boundaries
+        run: python test_workspace_mcp.py
+
+      - name: Test local bridge and WebSocket origin policy
+        run: python test_bridge_e2e.py
