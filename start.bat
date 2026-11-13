@@ -184,6 +184,18 @@ if errorlevel 2 (
     call :log "Terminal command execution enabled by explicit user approval."
 )
 
+echo.
+echo   SECURITY: Only the exact OpenRender browser extension may connect.
+echo   Open chrome://extensions, copy the ID shown under OpenRender, and paste it here.
+set "OPENRENDER_EXTENSION_ID="
+set /p "OPENRENDER_EXTENSION_ID=OpenRender extension ID: "
+if not defined OPENRENDER_EXTENSION_ID (
+    echo   ERROR: Extension ID is required. Load the extension first, then retry.
+    call :log "FATAL: OpenRender extension ID was not provided."
+    pause
+    exit /b 1
+)
+
 REM If a previous bridge is already listening on 17613, say so instead of
 REM silently killing it - a double-launch is easy to do by mistake (e.g.
 REM double-clicking start.bat twice) and should not look like nothing happened.
