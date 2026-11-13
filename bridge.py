@@ -1495,9 +1495,13 @@ async def main():
         await asyncio.sleep(0.6)  # let Windows release the socket before we bind
 
     try:
-        # Only browser-extension origins are accepted. This blocks ordinary
-        # websites from opening a WebSocket to the local filesystem bridge.
-        extension_origin = re.compile(r"^chrome-extension://[a-p]{32}$")
+        # Bind the local bridge to this one installed extension, not every
+        # extension in the browser. The ID is copied from chrome://extensions.
+        extension_id = os.environ.get("OPENRENDER_EXTENSION_ID", "").strip().lower()
+        if not re.fullmatch(r"[a-p]{32}", extension_id):
+            log("cannot start: set OPENRENDER_EXTENSION_ID to the exact OpenRender extension ID from chrome://extensions.", "rd")
+            return
+        extension_origin = f"chrome-extension://{extension_id}"
         server_ctx = await websockets.serve(
             handler, HOST, PORT, origins=[extension_origin],
             ping_interval=20, ping_timeout=20, max_size=16 * 1024 * 1024)
