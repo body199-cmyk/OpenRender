@@ -167,6 +167,23 @@ REM --- 3. Run the bridge ------------------------------------------------------
 echo.
 echo   [3/3] Starting bridge...
 
+REM Terminal execution is powerful: it can run any command as this Windows user.
+REM Keep it OFF by default and require an explicit choice for each launch.
+set "OPENRENDER_ALLOW_COMMANDS=0"
+echo.
+echo   SECURITY: Terminal access lets the AI execute commands as your Windows user.
+echo   Leave this disabled unless you specifically need the AI to run tests/builds.
+choice /C YN /N /M "Allow terminal commands for this session? [Y/N] "
+if errorlevel 2 (
+    set "OPENRENDER_ALLOW_COMMANDS=0"
+    echo         Terminal access: DISABLED
+    call :log "Terminal command execution disabled for this session."
+) else (
+    set "OPENRENDER_ALLOW_COMMANDS=1"
+    echo         Terminal access: ENABLED by user approval for this session.
+    call :log "Terminal command execution enabled by explicit user approval."
+)
+
 REM If a previous bridge is already listening on 17613, say so instead of
 REM silently killing it - a double-launch is easy to do by mistake (e.g.
 REM double-clicking start.bat twice) and should not look like nothing happened.
