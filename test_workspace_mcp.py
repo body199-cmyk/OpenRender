@@ -14,7 +14,7 @@ tmp = Path(tempfile.mkdtemp(prefix="zs_ws_test_"))
 (tmp / "src" / "app.py").write_text("def main():\n    print('hello')\n\n\nif __name__ == '__main__':\n    main()\n", encoding="utf-8")
 (tmp / "README.md").write_text("# Demo project\nA test workspace.\n", encoding="utf-8")
 
-env = dict(os.environ, ZS_WORKSPACE_ROOT=str(tmp))
+env = dict(os.environ, ZS_WORKSPACE_ROOT=str(tmp), OPENRENDER_ALLOW_COMMANDS="1")
 proc = subprocess.Popen([sys.executable, str(SERVER)], stdin=subprocess.PIPE,
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                         text=True, encoding="utf-8", env=env)
@@ -163,6 +163,24 @@ check("run_command stdout", "exit code 0" in txt and "42" in txt)
 # run_command failing exit code still returns result
 r = tool("run_command", {"command": f'"{py}" -c "import sys; sys.exit(3)"'})
 check("run_command nonzero reported", "exit code 3" in r["result"]["content"][0]["text"])
+
+# SECURITY: credential files and directories are never exposed to the model.
+(tmp / ".env").write_text("API_TOKEN=do-not-leak-this-test-value\\n", encoding="utf-8")
+(tmp / "credentials.json").write_text('{"token":"do-not-leak-this-test-value"}', encoding="utf-8")
+(tmp / ".git").mkdir()
+(tmp / ".git" / "config").write_text("[remote]\\nurl=https://example.invalid/repo\\n", encoding="utf-8")
+r = tool("read_file", {"path": ".env"})
+check("block .env read", "error" in r and "sensitive" in r["error"]["message"])
+r = tool("read_file", {"path": "credentials.json"})
+check("block credentials read", "error" in r and "sensitive" in r["error"]["message"])
+r = tool("read_file", {"path": ".git/config"})
+check("block .git read", "error" in r and "sensitive" in r["error"]["message"])
+r = tool("grep_files", {"query": "do-not-leak-this-test-value"})
+check("grep excludes credential files", "No matches" in r["result"]["content"][0]["text"])
+r = tool("list_directory", {})
+check("list_directory hides credential entries", ".env" not in r["result"]["content"][0]["text"] and "credentials.json" not in r["result"]["content"][0]["text"])
+r = tool("tree", {})
+check("tree hides credential entries", ".env" not in r["result"]["content"][0]["text"] and "credentials.json" not in r["result"]["content"][0]["text"])
 
 # SECURITY: escapes refused
 r = tool("read_file", {"path": "../outside.txt"})
