@@ -189,7 +189,7 @@ Además mantiene **memoria persistente** en `PROJECT_MEMORY.md`: arquitectura, c
 - **Límites de workspace:** las rutas se resuelven dentro de la carpeta elegida; intentos de salir mediante `..` o rutas absolutas externas se rechazan. La raíz no se puede borrar ni mover.
 - **Archivos sensibles bloqueados:** `.env`, credenciales, claves privadas y `.git` se excluyen de lectura, búsqueda y listados (las plantillas `.env.example/.sample/.template` siguen permitidas).
 - **Terminal desactivada por defecto:** `run_command` no se anuncia ni se ejecuta salvo que el usuario la habilite expresamente al iniciar. Si se habilita, los comandos corren con los permisos de la cuenta de Windows; actívala solo cuando sea necesario.
-- **WebSocket restringido:** el puente escucha solo en `127.0.0.1:17613` y acepta orígenes de extensiones Chromium, no páginas web normales.
+- **WebSocket restringido:** el puente escucha solo en `127.0.0.1:17613` y acepta únicamente el ID exacto de la extensión OpenRender que pegas al iniciar; rechaza sitios web y otras extensiones.
 - **Solo servidor workspace:** las entradas de servidores MCP adicionales en `config.json` se ignoran y el registro dinámico de servidores está deshabilitado para evitar ejecutar procesos arbitrarios.
 - **Tú eliges la carpeta:** la IA solo ve los archivos permitidos dentro del workspace activo. Cambiar de proyecto cambia su ámbito de trabajo.
 - **Código abierto:** todo lo que ejecuta está en este repo y puede auditarse.
