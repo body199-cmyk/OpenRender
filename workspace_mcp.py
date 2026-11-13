@@ -51,8 +51,37 @@ TREE_DEFAULT_DEPTH = 3
 TREE_MAX_DEPTH = 8
 IGNORED_DIR_NAMES = {".git", "node_modules", "__pycache__", ".venv", "venv",
                      ".idea", ".vscode", "dist", "build", ".next", "coverage"}
+PROTECTED_EXACT_NAMES = {
+    ".git", ".ssh", ".aws", ".azure", ".gcloud", ".kube",
+    ".npmrc", ".pypirc", ".netrc", "id_rsa", "id_ed25519",
+    "credentials.json", "secrets", "secret",
+}
+PROTECTED_SUFFIXES = {".pem", ".key", ".p12", ".pfx", ".keystore"}
+ALLOWED_ENV_TEMPLATES = {".env.example", ".env.sample", ".env.template"}
+ALLOW_COMMANDS = os.environ.get("OPENRENDER_ALLOW_COMMANDS", "").strip() == "1"
 
 ROOT: Path = Path(".").resolve()
+
+
+def is_protected_component(name: str) -> bool:
+    """Return True for common credential/config files that must not enter chat."""
+    low = name.lower()
+    if low in PROTECTED_EXACT_NAMES:
+        return True
+    if low == ".env" or (low.startswith(".env.") and low not in ALLOWED_ENV_TEMPLATES):
+        return True
+    if low.startswith("secrets."):
+        return True
+    return Path(low).suffix in PROTECTED_SUFFIXES
+
+
+def is_protected_path(path: Path) -> bool:
+    """Check a workspace path for protected components after resolution."""
+    try:
+        rel = path.resolve().relative_to(ROOT.resolve())
+    except (OSError, ValueError):
+        return True
+    return any(is_protected_component(part) for part in rel.parts)
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -71,6 +100,8 @@ def resolve_path(rel: object, *, must_exist: bool = False) -> Path:
     candidate = Path(raw)
     if candidate.is_absolute():
         raise ToolError(f"paths must be relative to the workspace root, got '{raw}'")
+    if any(is_protected_component(part) for part in raw.split("/") if part not in ("", ".", "..")):
+        raise ToolError(f"access to sensitive path '{raw}' is blocked by OpenRender")
     resolved = (ROOT / candidate).resolve()
     root_resolved = ROOT.resolve()
     if resolved != root_resolved and root_resolved not in resolved.parents:
@@ -149,16 +180,19 @@ def tool_workspace_info(args: dict) -> str:
     file_count = dir_count = 0
     total_size = 0
     for base, dirs, files in os.walk(ROOT):
-        dirs[:] = [d for d in dirs if d not in IGNORED_DIR_NAMES]
+        dirs[:] = [d for d in dirs if d not in IGNORED_DIR_NAMES and not is_protected_component(d)]
         dir_count += len(dirs)
         for f in files:
+            if is_protected_component(f):
+                continue
             file_count += 1
             try:
                 total_size += os.path.getsize(os.path.join(base, f))
             except OSError:
                 pass
     top = sorted(
-        (e.name + ("/" if e.is_dir() else "") for e in ROOT.iterdir()),
+        (e.name + ("/" if e.is_dir() else "") for e in ROOT.iterdir()
+         if not is_protected_component(e.name)),
         key=str.lower,
     )
     lines = [
@@ -178,7 +212,8 @@ def tool_list_directory(args: dict) -> str:
     p = resolve_path(args.get("path"), must_exist=True)
     if not p.is_dir():
         raise ToolError(f"'{rel_display(p)}' is a file, not a folder")
-    entries = sorted(p.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower()))
+    entries = sorted((e for e in p.iterdir() if not is_protected_component(e.name)),
+                     key=lambda e: (not e.is_dir(), e.name.lower()))
     if not entries:
         return f"{rel_display(p)}/ is empty."
     lines = []
@@ -216,7 +251,9 @@ def tool_tree(args: dict) -> str:
             entries = sorted(d.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower()))
         except OSError:
             return
-        visible = [e for e in entries if e.is_file() or e.name not in IGNORED_DIR_NAMES]
+        visible = [e for e in entries
+                   if not is_protected_component(e.name)
+                   and (e.is_file() or e.name not in IGNORED_DIR_NAMES)]
         for i, e in enumerate(visible):
             last = i == len(visible) - 1
             branch = "`-- " if last else "|-- "
@@ -400,6 +437,8 @@ def tool_search_files(args: dict) -> str:
     matches: list[str] = []
     try:
         for m in ROOT.glob(pattern):
+            if is_protected_path(m):
+                continue
             rel = rel_display(m)
             tag = "dir/" if m.is_dir() else ""
             matches.append(f"  {rel}{tag}")
@@ -429,9 +468,9 @@ def tool_grep_files(args: dict) -> str:
     hits: list[str] = []
     scanned = 0
     try:
-        candidates = [c for c in ROOT.glob(include) if c.is_file()]
+        candidates = [c for c in ROOT.glob(include) if c.is_file() and not is_protected_path(c)]
     except (OSError, ValueError):
-        candidates = [c for c in ROOT.rglob("*") if c.is_file()]
+        candidates = [c for c in ROOT.rglob("*") if c.is_file() and not is_protected_path(c)]
     for path in candidates:
         if len(hits) >= GREP_MAX_RESULTS:
             break
@@ -459,6 +498,10 @@ def tool_grep_files(args: dict) -> str:
 
 
 def tool_run_command(args: dict) -> str:
+    if not ALLOW_COMMANDS:
+        raise ToolError(
+            "terminal execution is disabled for this session. Restart OpenRender and explicitly "
+            "approve terminal access when prompted to enable it.")
     command = str(args.get("command", "") or "").strip()
     if not command:
         raise ToolError("'command' is required, e.g. \"python main.py\" or \"npm install\"")
@@ -673,7 +716,8 @@ def handle(msg: dict) -> None:
         return
 
     if method == "tools/list":
-        _result(mid, {"tools": TOOLS})
+        visible_tools = TOOLS if ALLOW_COMMANDS else [t for t in TOOLS if t["name"] != "run_command"]
+        _result(mid, {"tools": visible_tools})
         return
 
     if method == "tools/call":
