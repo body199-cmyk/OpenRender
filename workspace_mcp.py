@@ -693,7 +693,7 @@ _DISPATCH = {
 #  JSON-RPC LOOP (stdio, line-delimited - exactly what bridge.py speaks)
 # ══════════════════════════════════════════════════════════════════════════
 def _send(obj: dict) -> None:
-    sys.stdout.write(json.dumps(obj, ensure_ascii=False) + "\n")
+    # Emit ASCII-safe JSON on stdio. Windows consoles may use legacy code pages\n    # (e.g. cp1252/cp1256) that cannot encode Arabic, emoji, or other Unicode.\n    # JSON escaping preserves the exact Unicode value after the MCP client parses it.\n    sys.stdout.write(json.dumps(obj, ensure_ascii=True) + "\n")
     sys.stdout.flush()
 
 
