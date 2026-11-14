@@ -12,9 +12,9 @@ SERVER = HERE / "workspace_mcp.py"
 tmp = Path(tempfile.mkdtemp(prefix="zs_ws_test_"))
 (tmp / "src").mkdir()
 (tmp / "src" / "app.py").write_text("def main():\n    print('hello')\n\n\nif __name__ == '__main__':\n    main()\n", encoding="utf-8")
-(tmp / "README.md").write_text("# Demo project\nA test workspace.\n", encoding="utf-8")
+(tmp / "README.md").write_text("# Demo project\nA test workspace.\n", encoding="utf-8")\n(tmp / "unicode.txt").write_text("مرحبا — café 🚀\n", encoding="utf-8")
 
-env = dict(os.environ, ZS_WORKSPACE_ROOT=str(tmp), OPENRENDER_ALLOW_COMMANDS="1")
+env = dict(os.environ, ZS_WORKSPACE_ROOT=str(tmp), OPENRENDER_ALLOW_COMMANDS="1",\n           PYTHONIOENCODING="cp1252")
 proc = subprocess.Popen([sys.executable, str(SERVER)], stdin=subprocess.PIPE,
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                         text=True, encoding="utf-8", env=env)
@@ -91,7 +91,7 @@ r = tool("read_file", {"path": "src/app.py", "offset": 4, "limit": 2})
 txt = r["result"]["content"][0]["text"]
 check("read_file offset/limit", ("4 | " in txt) and ("6 | " not in txt))
 
-# write_file new nested path
+# Unicode read_file must survive a legacy Windows stdout code page.\nr = tool("read_file", {"path": "unicode.txt"})\ntxt = r["result"]["content"][0]["text"]\ncheck("read_file Unicode on cp1252 stdout", "مرحبا — café 🚀" in txt)\n\n# write_file new nested path
 r = tool("write_file", {"path": "src/utils/helpers.js", "content": "export const add = (a, b) => a + b;\n"})
 check("write_file creates parents", "Created" in r["result"]["content"][0]["text"])
 
