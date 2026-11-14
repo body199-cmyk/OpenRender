@@ -12,9 +12,11 @@ SERVER = HERE / "workspace_mcp.py"
 tmp = Path(tempfile.mkdtemp(prefix="zs_ws_test_"))
 (tmp / "src").mkdir()
 (tmp / "src" / "app.py").write_text("def main():\n    print('hello')\n\n\nif __name__ == '__main__':\n    main()\n", encoding="utf-8")
-(tmp / "README.md").write_text("# Demo project\nA test workspace.\n", encoding="utf-8")\n(tmp / "unicode.txt").write_text("مرحبا — café 🚀\n", encoding="utf-8")
+(tmp / "README.md").write_text("# Demo project\nA test workspace.\n", encoding="utf-8")
+(tmp / "unicode.txt").write_text("\\u0645\\u0631\\u062d\\u0628\\u0627 \\u2014 caf\\u00e9 \\U0001f680\\n", encoding="utf-8")
 
-env = dict(os.environ, ZS_WORKSPACE_ROOT=str(tmp), OPENRENDER_ALLOW_COMMANDS="1",\n           PYTHONIOENCODING="cp1252")
+env = dict(os.environ, ZS_WORKSPACE_ROOT=str(tmp), OPENRENDER_ALLOW_COMMANDS="1",
+           PYTHONIOENCODING="cp1252")
 proc = subprocess.Popen([sys.executable, str(SERVER)], stdin=subprocess.PIPE,
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                         text=True, encoding="utf-8", env=env)
