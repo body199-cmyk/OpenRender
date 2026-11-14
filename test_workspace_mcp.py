@@ -93,7 +93,10 @@ r = tool("read_file", {"path": "src/app.py", "offset": 4, "limit": 2})
 txt = r["result"]["content"][0]["text"]
 check("read_file offset/limit", ("4 | " in txt) and ("6 | " not in txt))
 
-# Unicode read_file must survive a legacy Windows stdout code page.\nr = tool("read_file", {"path": "unicode.txt"})\ntxt = r["result"]["content"][0]["text"]\ncheck("read_file Unicode on cp1252 stdout", "مرحبا — café 🚀" in txt)\n\n# write_file new nested path
+# Unicode read_file must survive a legacy Windows stdout code page.
+r = tool("read_file", {"path": "unicode.txt"})
+txt = r["result"]["content"][0]["text"]
+check("read_file Unicode on cp1252 stdout", "\u0645\u0631\u062d\u0628\u0627 \u2014 caf\u00e9 \U0001f680" in txt)
 r = tool("write_file", {"path": "src/utils/helpers.js", "content": "export const add = (a, b) => a + b;\n"})
 check("write_file creates parents", "Created" in r["result"]["content"][0]["text"])
 
